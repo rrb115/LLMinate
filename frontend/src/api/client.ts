@@ -24,6 +24,6 @@ export const api = {
   results: (scanId: number) => req<Candidate[]>(`/api/results/${scanId}`),
   patch: (scanId: number, candidateId: number) => req<Patch>(`/api/patch/${scanId}/${candidateId}`),
   shadow: (scanId: number, candidateId: number) => req<ShadowResult>(`/api/shadow-run/${scanId}/${candidateId}`, { method: "POST" }),
-  apply: (scanId: number, candidateId: number) => req<{ status: string; branch: string }>(`/api/apply/${scanId}/${candidateId}`, { method: "POST" }),
+  apply: (scanId: number, candidateId: number) => req<{ status: string; branch: string }>(`/api/apply/${scanId}/${candidateId}?safety_flag=true`, { method: "POST" }),
   revert: (scanId: number, candidateId: number) => req<{ status: string; branch: string }>(`/api/revert/${scanId}/${candidateId}`, { method: "POST" }),
 };

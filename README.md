@@ -40,6 +40,7 @@ All `/api/*` endpoints require header:
 - Default mode is suggestion-only.
 - Auto-apply is reversible and isolated per candidate branch:
   - `ai-prune/{scan_id}/{candidate_id}`
+- Apply endpoint requires `safety_flag=true`.
 - Fallback behavior is attached to every candidate.
 
 ## Samples

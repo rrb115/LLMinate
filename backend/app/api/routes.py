@@ -71,7 +71,12 @@ def get_patch(scan_id: int, candidate_id: int, db: Session = Depends(get_db)) ->
 
 
 @router.post("/apply/{scan_id}/{candidate_id}")
-def apply_patch(scan_id: int, candidate_id: int, db: Session = Depends(get_db)) -> dict[str, str]:
+def apply_patch(
+    scan_id: int,
+    candidate_id: int,
+    safety_flag: bool = False,
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
     candidate = (
         db.query(Candidate)
         .filter(Candidate.scan_id == scan_id, Candidate.id == candidate_id)
@@ -81,6 +86,8 @@ def apply_patch(scan_id: int, candidate_id: int, db: Session = Depends(get_db)) 
         raise HTTPException(status_code=404, detail="Candidate not found")
     if not candidate.patch_diff:
         raise HTTPException(status_code=400, detail="No patch generated")
+    if not safety_flag:
+        raise HTTPException(status_code=400, detail="Set safety_flag=true to apply patch")
 
     branch = apply_patch_in_branch(str(Path(__file__).resolve().parents[3]), scan_id, candidate_id, candidate.patch_diff)
     return {"status": "applied", "branch": branch}
