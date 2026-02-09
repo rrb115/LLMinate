@@ -1,0 +1,32 @@
+rules:
+  - id: openai-chat-completions
+    languages: [python]
+    severity: INFO
+    message: OpenAI chat completion call
+    pattern-either:
+      - pattern: $CLIENT.chat.completions.create(...)
+      - pattern: openai.ChatCompletion.create(...)
+
+  - id: anthropic-messages
+    languages: [python]
+    severity: INFO
+    message: Anthropic messages call
+    pattern: $CLIENT.messages.create(...)
+
+  - id: generic-generate
+    languages: [python, javascript, typescript]
+    severity: INFO
+    message: Generic generate API call
+    pattern-either:
+      - pattern: $CLIENT.generate(...)
+      - pattern: $CLIENT.complete(...)
+      - pattern: $CLIENT.chat(...)
+
+  - id: js-openai
+    languages: [javascript, typescript]
+    severity: INFO
+    message: JS OpenAI call
+    pattern-either:
+      - pattern: $CLIENT.chat.completions.create(...)
+      - pattern: openai.chat.completions.create(...)
+      - pattern: model.generateContent(...)
