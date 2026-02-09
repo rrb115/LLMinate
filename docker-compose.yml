@@ -1,0 +1,41 @@
+services:
+  db:
+    image: nouchka/sqlite3:latest
+    command: ["tail", "-f", "/dev/null"]
+    volumes:
+      - app_db:/data
+
+  backend:
+    build:
+      context: ./backend
+    container_name: de-llmifier-backend
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - ./:/workspace
+      - app_db:/data
+    working_dir: /workspace/backend
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: de-llmifier-frontend
+    environment:
+      - VITE_API_BASE=http://localhost:8000
+      - VITE_LOCAL_AUTH_TOKEN=local-dev
+    volumes:
+      - ./:/workspace
+    working_dir: /workspace/frontend
+    command: ["npm", "run", "dev"]
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  app_db:
