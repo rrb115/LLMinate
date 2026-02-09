@@ -1,0 +1,32 @@
+[
+    {
+        "id": "std_yes_no",
+        "intent": "yes_no_classification",
+        "patterns": [
+            "yes_no_rule"
+        ],
+        "language": "python",
+        "replacement_code": "def yes_no_rule(text: str) -> str:\n    lowered = text.lower()\n    positives = [\"allow\", \"pass\", \"success\", \"approved\", \"yes\", \"true\"]\n    negatives = [\"deny\", \"fail\", \"error\", \"rejected\", \"no\", \"false\"]\n    pos = sum(1 for p in positives if p in lowered)\n    neg = sum(1 for n in negatives if n in lowered)\n    return \"YES\" if pos >= neg else \"NO\"",
+        "test_case": "assert yes_no_rule('yes') == 'YES'"
+    },
+    {
+        "id": "std_structured_extract",
+        "intent": "structured_extraction",
+        "patterns": [
+            "structured_extract_rule"
+        ],
+        "language": "python",
+        "replacement_code": "import re\n\ndef structured_extract_rule(text: str) -> dict[str, str]:\n    patterns = {\n        \"name\": r\"name[:\\-]\\s*([A-Za-z ]+)\",\n        \"email\": r\"email[:\\-]\\s*([\\w\\.-]+@[\\w\\.-]+)\",\n        \"id\": r\"id[:\\-]\\s*([A-Za-z0-9\\-]+)\",\n    }\n    out: dict[str, str] = {}\n    for key, pat in patterns.items():\n        match = re.search(pat, text, re.IGNORECASE)\n        if match:\n            out[key] = match.group(1).strip()\n    return out",
+        "test_case": "assert structured_extract_rule('name: John') == {'name': 'John'}"
+    },
+    {
+        "id": "std_fuzzy_match",
+        "intent": "small_domain_label_matching",
+        "patterns": [
+            "fuzzy_label_match"
+        ],
+        "language": "python",
+        "replacement_code": "from difflib import SequenceMatcher\n\ndef fuzzy_label_match(query: str, labels: list[str], synonyms: dict[str, str]) -> str:\n    q = query.lower().strip()\n    if q in synonyms:\n        return synonyms[q]\n\n    best = \"\"\n    score = 0.0\n    for label in labels:\n        current = SequenceMatcher(None, q, label.lower()).ratio()\n        if current > score:\n            score = current\n            best = label\n    return best",
+        "test_case": "assert fuzzy_label_match('cat', ['dog', 'cat'], {}) == 'cat'"
+    }
+]

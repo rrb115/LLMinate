@@ -37,7 +37,13 @@ def _process_job(db: Session, job: Job) -> None:
     db.commit()
 
     if job.kind == "scan":
-        run_scan(db, int(payload["scan_id"]), payload["target_path"])
+        run_scan(
+            db, 
+            int(payload["scan_id"]), 
+            payload["target_path"],
+            api_key=payload.get("api_key"),
+            api_provider=payload.get("api_provider")
+        )
         job.result = "scan_complete"
     elif job.kind == "shadow":
         candidate = db.get(Candidate, int(payload["candidate_id"]))

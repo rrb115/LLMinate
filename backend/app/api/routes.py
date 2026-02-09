@@ -1,10 +1,12 @@
-from __future__ import annotations
-
 import json
+import shutil
+import tempfile
 import time
+import zipfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Form
+from git import Repo
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -15,8 +17,9 @@ from app.models.job import Job
 from app.models.scan import Scan
 from app.schemas.candidate import CandidateOut, PatchResponse, ShadowRunResponse
 from app.schemas.metrics import MetricsResponse
-from app.schemas.scan import ScanRequest, ScanResponse, StatusResponse
+from app.schemas.scan import ScanRequest, GitScanRequest, ScanResponse, StatusResponse
 from app.services.git_service import apply_patch_in_branch, revert_branch
+from app.refactor.planner import get_rule_code
 from app.workers.queue import enqueue_job
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_local_auth)])
@@ -33,7 +36,108 @@ def start_scan(payload: ScanRequest, db: Session = Depends(get_db)) -> ScanRespo
     db.commit()
     db.refresh(scan)
 
-    enqueue_job("scan", {"scan_id": scan.id, "target_path": str(target)}, scan_id=scan.id)
+    enqueue_job(
+        "scan", 
+        {
+            "scan_id": scan.id, 
+            "target_path": str(target),
+            "api_key": payload.api_key,
+            "api_provider": payload.api_provider
+        }, 
+        scan_id=scan.id
+    )
+    return ScanResponse(scan_id=scan.id, status=scan.status)
+
+
+
+@router.post("/scan/upload", response_model=ScanResponse)
+async def upload_scan(
+    file: UploadFile = File(...), 
+    api_key: str | None = Form(None),
+    api_provider: str | None = Form(None),
+    db: Session = Depends(get_db)
+) -> ScanResponse:
+    if not file.filename.endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Only .zip files are supported")
+
+    upload_dir = Path(tempfile.gettempdir()) / "llminate_uploads"
+    upload_dir.mkdir(exist_ok=True)
+    
+    # create a unique directory for this scan
+    scan_subdir = upload_dir / f"scan_{int(time.time())}"
+    scan_subdir.mkdir(exist_ok=True)
+    
+    zip_path = scan_subdir / file.filename
+
+    with zip_path.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    extract_path = scan_subdir / "extracted"
+    extract_path.mkdir(exist_ok=True)
+    
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(extract_path)
+    except zipfile.BadZipFile:
+        shutil.rmtree(scan_subdir)
+        raise HTTPException(status_code=400, detail="Invalid zip file")
+
+    # Find the root of the project (heuristic: look for the first directory if it's nested)
+    # Often zips contain a root directory 'project/' then files.
+    contents = list(extract_path.iterdir())
+    if len(contents) == 1 and contents[0].is_dir():
+        target = contents[0]
+    else:
+        target = extract_path
+
+    scan = Scan(target_path=str(target.resolve()), status="queued", progress=0, logs="")
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+
+    enqueue_job(
+        "scan", 
+        {
+            "scan_id": scan.id, 
+            "target_path": str(target.resolve()),
+            "api_key": api_key,
+            "api_provider": api_provider
+        }, 
+        scan_id=scan.id
+    )
+    return ScanResponse(scan_id=scan.id, status=scan.status)
+
+
+@router.post("/scan/git", response_model=ScanResponse)
+def start_git_scan(payload: GitScanRequest, db: Session = Depends(get_db)) -> ScanResponse:
+    clone_dir = Path(tempfile.gettempdir()) / "llminate_clones"
+    clone_dir.mkdir(exist_ok=True)
+    
+    # create a unique directory for this repo
+    # Extract repo name for readability if possible
+    repo_name = payload.url.rstrip("/").split("/")[-1].replace(".git", "")
+    target_dir = clone_dir / f"{repo_name}_{int(time.time())}"
+    
+    try:
+        Repo.clone_from(payload.url, target_dir, depth=1)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Git clone failed: {str(e)}")
+
+    scan = Scan(target_path=str(target_dir.resolve()), status="queued", progress=0, logs="")
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+
+    enqueue_job(
+        "scan", 
+        {
+            "scan_id": scan.id, 
+            "target_path": str(target_dir.resolve()),
+            "api_key": payload.api_key,
+            "api_provider": payload.api_provider
+        }, 
+        scan_id=scan.id
+    )
     return ScanResponse(scan_id=scan.id, status=scan.status)
 
 
@@ -45,10 +149,16 @@ def get_status(scan_id: int, db: Session = Depends(get_db)) -> StatusResponse:
     return StatusResponse(scan_id=scan.id, status=scan.status, progress=scan.progress, logs=scan.logs)
 
 
-@router.get("/results/{scan_id}", response_model=list[CandidateOut])
-def get_results(scan_id: int, db: Session = Depends(get_db)) -> list[CandidateOut]:
-    rows = db.query(Candidate).filter(Candidate.scan_id == scan_id).order_by(Candidate.id.asc()).all()
-    return [CandidateOut.model_validate(row) for row in rows]
+@router.get("/results/{scan_id}", response_model=dict[str, list[CandidateOut]])
+def get_results(scan_id: int, db: Session = Depends(get_db)) -> dict[str, list[CandidateOut]]:
+    rows = db.query(Candidate).filter(Candidate.scan_id == scan_id).order_by(Candidate.file.asc(), Candidate.line_start.asc()).all()
+    grouped: dict[str, list[CandidateOut]] = {}
+    for row in rows:
+        c = CandidateOut.model_validate(row)
+        if c.file not in grouped:
+            grouped[c.file] = []
+        grouped[c.file].append(c)
+    return grouped
 
 
 @router.get("/patch/{scan_id}/{candidate_id}", response_model=PatchResponse)
@@ -67,6 +177,7 @@ def get_patch(scan_id: int, candidate_id: int, db: Session = Depends(get_db)) ->
         explanation=candidate.patch_explanation,
         risk_level=candidate.risk_level,
         tests_to_add=candidate.tests_to_add,
+        rule_code=get_rule_code(candidate.inferred_intent),
     )
 
 

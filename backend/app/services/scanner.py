@@ -15,28 +15,45 @@ def append_log(scan: Scan, message: str) -> None:
     scan.logs = (scan.logs or "") + f"\n{message}"
 
 
-def run_scan(db: Session, scan_id: int, target_path: str) -> None:
+def run_scan(db: Session, scan_id: int, target_path: str, api_key: str | None = None, api_provider: str | None = None) -> None:
     scan = db.get(Scan, scan_id)
     if not scan:
         return
 
     scan.status = "running"
     scan.progress = 5
-    append_log(scan, "Scan started")
+    append_log(scan, f"Initiating deep scan on: {target_path}")
     db.commit()
 
     rules_path = str(Path(__file__).resolve().parents[2] / "semgrep_rules" / "ai_calls.yml")
+    append_log(scan, "Running static analysis (Semgrep)...")
+    db.commit()
+    
     hits = scan_for_ai_calls(target_path, rules_path)
-
-    scan.progress = 50
-    append_log(scan, f"Detected {len(hits)} potential AI calls")
+    
+    scan.progress = 30
+    append_log(scan, f"Found {len(hits)} potential AI calls to optimize.")
     db.commit()
 
-    for hit in hits:
+    for i, hit in enumerate(hits):
+        file_name = Path(hit.file).name
+        
+        # Incremental progress
+        step_progress = 30 + int((i / len(hits)) * 60) if hits else 90
+        scan.progress = step_progress
+        
+        append_log(scan, f"Analyzing {file_name}:{hit.line_start}...")
+        db.commit()
+
         intent, confidence = infer_intent(hit.prompt, hit.snippet)
         score = score_solvability(intent, hit.prompt)
+        
+        append_log(scan, f"Requesting AI synthesis for intent: '{intent}' (Provider: {api_provider or 'Default'})...")
+        db.commit()
+
         patch_diff, patch_exp, tests_to_add = build_patch(
-            hit.file, hit.line_start, hit.line_end, intent
+            hit.file, hit.line_start, hit.line_end, intent, snippet=hit.snippet,
+            api_key=api_key, api_provider=api_provider
         )
 
         candidate = Candidate(
@@ -60,8 +77,13 @@ def run_scan(db: Session, scan_id: int, target_path: str) -> None:
             auto_refactor_safe=score.score >= 0.8,
         )
         db.add(candidate)
+        if patch_diff:
+            append_log(scan, f"Rule generated for {file_name}.")
+        else:
+            append_log(scan, f"No rule available for {file_name} yet.")
+        db.commit()
 
     scan.progress = 100
     scan.status = "completed"
-    append_log(scan, "Scan completed")
+    append_log(scan, "Scan and Synthesis complete. Results ready.")
     db.commit()

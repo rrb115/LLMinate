@@ -26,6 +26,7 @@ class PatchResponse(BaseModel):
     explanation: str
     risk_level: str
     tests_to_add: str
+    rule_code: str
 
 
 class ShadowRunResponse(BaseModel):

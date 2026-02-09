@@ -3,10 +3,10 @@ from __future__ import annotations
 import re
 
 
-YES_NO_RE = re.compile(r"respond\s+with\s+only\s+yes\s+or\s+no", re.IGNORECASE)
-STRUCTURED_RE = re.compile(r"json|extract|fields|schema", re.IGNORECASE)
-FUZZY_RE = re.compile(r"synonym|closest|label|match", re.IGNORECASE)
-SUMMARY_RE = re.compile(r"summari[sz]e|long-form|essay", re.IGNORECASE)
+YES_NO_RE = re.compile(r"yes\s*or\s*no|true\s*or\s*false|boolean", re.IGNORECASE)
+STRUCTURED_RE = re.compile(r"json|extract|fields|schema|parse", re.IGNORECASE)
+FUZZY_RE = re.compile(r"synonym|closest|label|match|categorize|classify", re.IGNORECASE)
+SUMMARY_RE = re.compile(r"summari[sz]e|long-form|essay|digest", re.IGNORECASE)
 
 
 def infer_intent(prompt: str, snippet: str) -> tuple[str, float]:

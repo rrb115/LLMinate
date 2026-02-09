@@ -3,6 +3,14 @@ from pydantic import BaseModel
 
 class ScanRequest(BaseModel):
     path: str
+    api_key: str | None = None
+    api_provider: str | None = None
+
+
+class GitScanRequest(BaseModel):
+    url: str
+    api_key: str | None = None
+    api_provider: str | None = None
 
 
 class ScanResponse(BaseModel):

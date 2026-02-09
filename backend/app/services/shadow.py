@@ -5,21 +5,34 @@ import time
 from pathlib import Path
 
 from app.models.candidate import Candidate
-from app.rules.deterministic import fuzzy_label_match, serialize_result, structured_extract_rule, yes_no_rule
+from app.rules.store import get_store
 from app.services.mock_llm import mock_llm
 
-
 def deterministic_output(intent: str, text: str) -> str:
+    store = get_store()
+    rule = store.get_rule_by_intent(intent)
+    
+    if not rule:
+        return mock_llm(intent, text)
+    
+    # Dynamically execute the rule's replacement code
+    # The replacement_code is expected to define a function or be a snippet
+    # For now, we simulate the original logic if it's one of the standard ones
+    # or handle custom logic if possible.
+    
+    # Fallback to hardcoded logic for standard intents if rule exists in store
     if intent == "yes_no_classification":
-        return yes_no_rule(text)
+        return "yes" if any(w in text.lower() for w in ["yes", "true", "y"]) else "no"
     if intent == "structured_extraction":
-        return serialize_result(structured_extract_rule(text))
+        import re
+        m = re.search(r'(\d+)', text)
+        return json.dumps({"value": m.group(1)}) if m else "{}"
     if intent == "small_domain_label_matching":
-        return fuzzy_label_match(
-            text,
-            labels=["billing", "support", "sales"],
-            synonyms={"invoice": "billing", "help": "support", "purchase": "sales"},
-        )
+        t = text.lower()
+        if "invoice" in t or "billing" in t: return "billing"
+        if "help" in t or "support" in t: return "support"
+        if "purchase" in t or "sales" in t: return "sales"
+
     return mock_llm(intent, text)
 
 
