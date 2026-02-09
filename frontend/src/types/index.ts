@@ -21,6 +21,13 @@ export interface Patch {
   explanation: string;
   risk_level: string;
   tests_to_add: string;
+  rule_code: string;
+  synthesis_mode: string;
+  synthesis_provider: string;
+  reason_for_refactor: string;
+  changes_summary: string;
+  estimated_reply_accuracy: number;
+  accuracy_note: string;
 }
 
 export interface ShadowResult {

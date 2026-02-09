@@ -1,3 +1,9 @@
+# Environments
+.env
+.env.*
+!.env.example
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -5,7 +11,43 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-backend/app.db
+.venv/
+env/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Node / Frontend
 node_modules/
 frontend/dist/
+frontend/node_modules/
 playwright-report/
+*.tsbuildinfo
+.npm
+.eslintcache
+
+# Databases
+*.db
+*.sqlite3
+
+# Local/Learned Rules
+backend/app/rules/private/
+
+# Data (Clones/Uploads)
+backend/data/*
+!backend/data/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+.python-version
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Clones/Temporary
+llminate_clones/
+temp/
