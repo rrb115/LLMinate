@@ -48,7 +48,7 @@ def run_scan(db: Session, scan_id: int, target_path: str, api_key: str | None = 
         intent, confidence = infer_intent(hit.prompt, hit.snippet)
         score = score_solvability(intent, hit.prompt)
         
-        append_log(scan, f"Requesting AI synthesis for intent: '{intent}' (Provider: {api_provider or 'Default'})...")
+        append_log(scan, f"Planning refactor for intent: '{intent}' using progressive certainty pipeline...")
         db.commit()
 
         patch_diff, patch_exp, tests_to_add = build_patch(

@@ -1,0 +1,32 @@
+[
+  {
+    "pattern_id": "std_yes_no_openai_py_v1",
+    "intent": "yes_no_classification",
+    "language": "python",
+    "source_example": "resp = client.chat.completions.create(\n    model=\"gpt-4o-mini\",\n    messages=[{\"role\": \"user\", \"content\": prompt}],\n)",
+    "prompt_contract": "Respond with ONLY YES or NO",
+    "output_schema": "ENUM: YES|NO",
+    "replacement_template": "def yes_no_rule(text: str) -> str:\n    lowered = text.lower()\n    positives = [\"allow\", \"pass\", \"success\", \"approved\", \"yes\", \"true\"]\n    negatives = [\"deny\", \"fail\", \"error\", \"rejected\", \"no\", \"false\"]\n    pos = sum(1 for p in positives if p in lowered)\n    neg = sum(1 for n in negatives if n in lowered)\n    return \"YES\" if pos >= neg else \"NO\"",
+    "constraints": ["binary-output", "no-llm"],
+    "tests": "assert yes_no_rule('yes') == 'YES'",
+    "metadata": {
+      "source": "legacy-rule-store",
+      "version": "1.0"
+    }
+  },
+  {
+    "pattern_id": "std_structured_extract_anthropic_py_v1",
+    "intent": "structured_extraction",
+    "language": "python",
+    "source_example": "return client.messages.create(\n    model=\"claude-mock\",\n    max_tokens=200,\n    messages=[{\"role\": \"user\", \"content\": f\"Extract fields as JSON only: name, email, id from: {raw}\"}],\n)",
+    "prompt_contract": "Extract fields as JSON only",
+    "output_schema": "JSON_OBJECT",
+    "replacement_template": "import re\n\n\ndef structured_extract_rule(text: str) -> dict[str, str]:\n    patterns = {\n        \"name\": r\"name[:\\-]\\s*([A-Za-z ]+)\",\n        \"email\": r\"email[:\\-]\\s*([\\w\\.-]+@[\\w\\.-]+)\",\n        \"id\": r\"id[:\\-]\\s*([A-Za-z0-9\\-]+)\",\n    }\n    out: dict[str, str] = {}\n    for key, pat in patterns.items():\n        match = re.search(pat, text, re.IGNORECASE)\n        if match:\n            out[key] = match.group(1).strip()\n    return out",
+    "constraints": ["json-output", "no-llm"],
+    "tests": "assert structured_extract_rule('name: John') == {'name': 'John'}",
+    "metadata": {
+      "source": "legacy-rule-store",
+      "version": "1.0"
+    }
+  }
+]

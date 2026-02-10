@@ -23,16 +23,23 @@ class RefactorAgent:
         def is_real(k: str | None) -> bool:
             return bool(k and len(k) > 10 and not k.startswith("sk-...") and not k.endswith("..."))
 
-        # Use provided credentials if both are present and provider's != "none"
-        if api_key and provider and provider != "none":
+        # Use provided credentials only if BOTH are present, valid, and provider != "none"
+        use_provided = api_key and is_real(api_key) and provider and provider != "none"
+        
+        if use_provided:
+            logger.info(f"Using provided {provider} credentials")
             self._setup_provider(provider, api_key)
         else:
             # Fallback to settings
+            logger.debug(f"Falling back to settings. OpenAI: {is_real(settings.openai_api_key)}, Anthropic: {is_real(settings.anthropic_api_key)}, Gemini: {is_real(settings.google_api_key)}")
             if is_real(settings.openai_api_key):
+                logger.info("Using OpenAI from settings")
                 self._setup_provider("openai", settings.openai_api_key)
             elif is_real(settings.anthropic_api_key):
+                logger.info("Using Anthropic from settings")
                 self._setup_provider("anthropic", settings.anthropic_api_key)
             elif is_real(settings.google_api_key):
+                logger.info("Using Gemini from settings")
                 self._setup_provider("gemini", settings.google_api_key)
             else:
                 logger.warning("No valid AI API keys detected in settings or request.")
